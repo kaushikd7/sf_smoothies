@@ -1,9 +1,9 @@
 # Import python packages
 import streamlit as st
-#pip install snowflake-snowpark-python
-#from snowflake.snowpark.context import get_active_session
+from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark.functions import col
 import requests
+
 
 helpful_links = [
     "https://docs.streamlit.io",
@@ -19,10 +19,15 @@ st.write("Choose the fruits you want in your customize smoothie")
 name_on_order = st.text_input("Name of smoothie:")
 st.write("The name on your smoothie will be", name_on_order)
 
-cnx= st.connection("snowflake")
-session = cnx.session()
-my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
-#st.dataframe(data=my_dataframe, use_container_width=True)
+session = get_active_session()
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'),col('SEARCH_ON'))
+st.dataframe(data=my_dataframe, use_container_width=True)
+#st.stop()
+
+
+pd_pf= my_dataframe.to_pandas()
+#st.dataframe(pd_pf)
+#st.stop()
 
 ingredient_list = st.multiselect(
     'Choose upto 5 ingredients:',
@@ -34,8 +39,9 @@ if ingredient_list:
     
     for fruit_chosen in ingredient_list:
         ingredients_string += fruit_chosen + ' '
+        search_on = pd_pf.loc[pd_pf['FRUIT_NAME']==fruit_chosen,'search_on'].iloc[0]
         st.subheader(fruit_chosen + 'Nutrition Information')
-        smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/" + fruit_chosen)
+        smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/" + search_on)
         sf_df = st.dataframe(data= smoothiefroot_response.json(), use_container_width = True)
 
     #st.write(ingredients_string)
@@ -43,11 +49,10 @@ if ingredient_list:
             values ('""" + ingredients_string + """','""" + name_on_order + """')"""
     time_to_insert = st.button('Submit Order')
 
-    #st.write(my_insert_stmt)
+    st.write(my_insert_stmt)
     st.stop()
     
 
     if time_to_insert:
         session.sql(my_insert_stmt).collect()
         st.success('Your Smoothie is ordered!', icon="✅")
-
